@@ -182,7 +182,8 @@ class ArpHandler(app_manager.RyuApp):
                           pre_actions=[]
                           ):
         if (ip_src+ip_dst) in ip_history:
-            return 0
+            print(ip_src+ip_dst)
+            pass
         else:
             ip_history.add((ip_src+ip_dst))
             
