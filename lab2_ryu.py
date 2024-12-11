@@ -24,17 +24,21 @@ class IPBasedRouting(app_manager.RyuApp):
         # Discover network topology
         switches = get_switch(self, None)
         links = get_link(self, None)
-        print(links)
+        
 
         # for switch in switches:
         #     self.network.add_node(switch.dp.id)
 
-        # for link in links:
-        #     self.network.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port)
-        #     self.network.add_edge(link.dst.dpid, link.src.dpid, port=link.dst.port)
+        for link in links:
+            print(link.src.dpid)
+            print(link.src.port)
+            print(link.dst.dpid)
+            print(link.dst.port)
+            # self.network.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port)
+            # self.network.add_edge(link.dst.dpid, link.src.dpid, port=link.dst.port)
 
-        # self.logger.info(f"Discovered switches: {list(self.network.nodes)}")
-        # self.logger.info(f"Discovered links: {list(self.network.edges)}")
+        self.logger.info(f"Discovered switches: {list(self.network.nodes)}")
+        self.logger.info(f"Discovered links: {list(self.network.edges)}")
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
