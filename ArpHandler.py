@@ -186,6 +186,11 @@ class ArpHandler(app_manager.RyuApp):
         if path is None:
             self.logger.info("Get path failed.")
             return 0
+        
+        temp_graph = self.graph.copy()
+        for i in range(len(path) - 1):
+            print(f"test {path[i]}")
+        
         if self.get_host_location(ip_src)[0] == src_dpid:
             print("path from " + ip_src + " to " + ip_dst +':')
             print(ip_src + ' ->'),
