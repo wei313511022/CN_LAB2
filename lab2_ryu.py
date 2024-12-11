@@ -158,12 +158,12 @@ class ShortestPath(app_manager.RyuApp):
         result = self.get_sw(datapath.id, in_port, ip_src, ip_dst)
         if result:
             src_sw, dst_sw, to_dst_port = result[0], result[1], result[2]
-            # if dst_sw:
+            if dst_sw:
                 # Path has already calculated, just get it.
-            to_dst_match = parser.OFPMatch(
-                eth_type = eth_type, ipv4_dst = ip_dst)
-            port_no = self.arp_handler.set_shortest_path(ip_src, ip_dst, src_sw, dst_sw, to_dst_port, to_dst_match)
-            self.send_packet_out(datapath, msg.buffer_id, in_port, port_no, msg.data)
+                to_dst_match = parser.OFPMatch(
+                    eth_type = eth_type, ipv4_dst = ip_dst)
+                port_no = self.arp_handler.set_shortest_path(ip_src, ip_dst, src_sw, dst_sw, to_dst_port, to_dst_match)
+                self.send_packet_out(datapath, msg.buffer_id, in_port, port_no, msg.data)
         return
 
     def get_sw(self, dpid, in_port, src, dst):
@@ -179,6 +179,7 @@ class ShortestPath(app_manager.RyuApp):
             if (dpid,  in_port) == src_location:
                 src_sw = src_location[0]
             else:
+                print("hi")
                 return None
 
         dst_location = self.arp_handler.get_host_location(dst)
