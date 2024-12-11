@@ -109,9 +109,9 @@ class SimpleSwitch13(app_manager.RyuApp):
         src = eth.src
 
         # Format and print the switch (datapath) name
-        dpid = format(datapath.id, "d").zfill(16)  # Format datapath ID
+        dpid = format(datapath.id, "d").zfill(1)  # Format datapath ID
         switch_name = f"Switch-{dpid}"  # Assign a readable name
-        print(f"Switch Name: {switch_name}")  # Print the switch name
+        print(f"Switch Name: {switch_name} | Host Sending Data: {src} | Destination Host: {dst}")
 
         self.mac_to_port.setdefault(dpid, {})
 
