@@ -181,10 +181,10 @@ class ArpHandler(app_manager.RyuApp):
                           to_dst_match,
                           pre_actions=[]
                           ):
-        if [ip_src,ip_dst] in ip_history:
+        if (ip_src+ip_dst) in ip_history:
             return 0
         else:
-            ip_history.add([ip_src,ip_dst])
+            ip_history.add((ip_src+ip_dst))
             
         if nx.has_path(self.graph, src_dpid, dst_dpid):
             path = nx.shortest_path(self.graph, src_dpid, dst_dpid)
