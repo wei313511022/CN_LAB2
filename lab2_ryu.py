@@ -26,16 +26,16 @@ class IPBasedRouting(app_manager.RyuApp):
         links = get_link(self, None)
         
 
-        # for switch in switches:
-        #     self.network.add_node(switch.dp.id)
+        for switch in switches:
+            self.network.add_node(switch.dp.id)
 
         for link in links:
-            print(link.src.dpid)
-            print(link.src.port_no)
-            print(link.dst.dpid)
-            print(link.dst.port_no)
-            # self.network.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port)
-            # self.network.add_edge(link.dst.dpid, link.src.dpid, port=link.dst.port)
+            # print(link.src.dpid)
+            # print(link.src.port_no)
+            # print(link.dst.dpid)
+            # print(link.dst.port_no)
+            self.network.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port_no)
+            self.network.add_edge(link.dst.dpid, link.src.dpid, port=link.dst.port_no)
 
         self.logger.info(f"Discovered switches: {list(self.network.nodes)}")
         self.logger.info(f"Discovered links: {list(self.network.edges)}")
