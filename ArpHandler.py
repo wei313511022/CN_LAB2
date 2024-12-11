@@ -196,7 +196,7 @@ class ArpHandler(app_manager.RyuApp):
             # print(ip_dst)
         
         temp_graph = self.graph.copy()
-        for i in range(1,(len(path) - 1)):
+        for i in range(len(path) - 1):
             temp_graph.remove_edge(path[i], path[i + 1])
             i = i + 1
         if nx.has_path(temp_graph, src_dpid, dst_dpid):
