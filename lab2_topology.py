@@ -1,4 +1,3 @@
-# -*- coding:utf-8 -*-
 from mininet.cli import CLI
 from mininet.net import Mininet
 from mininet.node import RemoteController
