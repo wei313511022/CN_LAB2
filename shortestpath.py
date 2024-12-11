@@ -1,147 +1,120 @@
 from ryu.base import app_manager
+from ryu.ofproto import ofproto_v1_3, ofproto_v1_3_parser
 from ryu.controller.handler import set_ev_cls
+from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller import ofp_event
-from ryu.controller.handler import MAIN_DISPATCHER,CONFIG_DISPATCHER
-from ryu.lib.packet import packet,ethernet
+from ryu.lib.packet import packet
+from ryu.lib.packet import ethernet
 from ryu.topology import event
-from ryu.topology.api import get_switch,get_link
-from ryu.ofproto import ofproto_v1_3
+from ryu.topology.api import get_switch, get_link
+import networkx as nx  # 要自己装，装1.11版本
  
-import networkx as nx
  
-class MyShortestForwarding(app_manager.RyuApp):
-    '''
-    class to achive shortest path to forward, based on minimum hop count
-    '''
+#  来源：https://blog.csdn.net/qq_37041925/article/details/84838848
+ 
+class ExampleShortestForwarding(app_manager.RyuApp):
+    """docstring for ClassName"""
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
  
-    def __init__(self,*args,**kwargs):
-        super(MyShortestForwarding,self).__init__(*args,**kwargs)
+    def __init__(self, *args, **kwargs):
+        super(ExampleShortestForwarding, self).__init__(*args, **kwargs)
+        self.topology_api_app = self # 即为我自己
+        self.network = nx.DiGraph()  # Digraph表示有向图
+        self.paths = {}
  
-        #set data structor for topo construction
-        self.network = nx.DiGraph()        #store the dj graph
-        self.paths = {}        #store the shortest path
-        self.topology_api_app = self
+    # handle switch features in packets
  
-    @set_ev_cls(ofp_event.EventOFPSwitchFeatures,CONFIG_DISPATCHER)
-    def switch_features_handler(self,ev):
-        '''
-        manage the initial link between switch and controller
-        '''
-        msg = ev.msg
-        datapath = msg.datapath
+    @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
+    def switch_features_handler(self, ev):
+        datapath = ev.msg.datapath
         ofproto = datapath.ofproto
         ofp_parser = datapath.ofproto_parser
  
-        match = ofp_parser.OFPMatch()    #for all packet first arrive, match it successful, send it ro controller
-        actions  = [ofp_parser.OFPActionOutput(
-                            ofproto.OFPP_CONTROLLER,ofproto.OFPCML_NO_BUFFER
-                            )]
- 
+        # install a table-miss flow entry for each datapath
+        match = ofp_parser.OFPMatch()
+        actions = [ofp_parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
+                                              ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
  
-    def add_flow(self,datapath,priority,match,actions):
-        '''
-        fulfil the function to add flow entry to switch
-        '''
+    # install flow entry
+    def add_flow(self, datapath, priority, match, actions):
         ofproto = datapath.ofproto
         ofp_parser = datapath.ofproto_parser
  
-        inst = [ofp_parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions)]
- 
-        mod = ofp_parser.OFPFlowMod(datapath=datapath,priority=priority,match=match,instructions=inst)
- 
+        inst = [ofp_parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
+                                                 actions)]
+        mod = ofp_parser.OFPFlowMod(
+            datapath=datapath, priority=priority, match=match, instructions=inst)
         datapath.send_msg(mod)
  
+    @set_ev_cls(event.EventSwitchEnter, [CONFIG_DISPATCHER, MAIN_DISPATCHER])
+    def get_topology(self, ev):
+        # get nodes
+        switch_list = get_switch(self.topology_api_app, None)
+        switches = [switch.dp.id for switch in switch_list]  # del self
+        self.network.add_nodes_from(switches)
  
-    @set_ev_cls(ofp_event.EventOFPPacketIn,MAIN_DISPATCHER)
-    def packet_in_handler(self,ev):
-        '''
-        manage the packet which comes from switch
-        '''
-        #first get event infomation
+        # get links
+        links_list = get_link(self.topology_api_app, None)
+        links = [(link.src.dpid, link.dst.dpid, {
+                  'port': link.src.port_no}) for link in links_list]
+        self.network.add_edges_from(links)
+ 
+        # get reverse links
+        links = [(link.dst.dpid, link.src.dpid, {
+                  'port': link.dst.port_no}) for link in links_list]
+  # too many unpacket
+        self.network.add_edges_from(links)
+    # get out_port by using networkx's Dijkstra algorithm.
+ 
+    def get_out_port(self, datapath, src, dst, in_port):
+        dpid = datapath.id
+        # add links between host and access  switch
+        if src not in self.network:
+            self.network.add_node(src)
+            self.network.add_edge(dpid, src, port=in_port) # 交换机到主机
+            self.network.add_edge(src, dpid)  # 主机到交换机，此时端口是没有意义的
+            self.paths.setdefault(src, {})
+ 
+        # search dst's shortest path.
+        if dst in self.network:
+            if dst not in self.paths[src]:
+                path = nx.shortest_path(self.network, src, dst) # 使用dijkstra算法
+                self.paths[src][dst] = path
+ 
+            path = self.paths[src][dst]
+            next_hop = path[path.index(dpid) + 1] # 即把path列表里存的下一跳取出来，并不是做计算
+            out_port = self.network[dpid][next_hop]['port']
+            print("path: ", path)
+        else:
+            out_port = datapath.ofproto.OFPP_FLOOD
+        return out_port
+ 
+    # handle packets in msg
+ 
+    @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
+    def packet_in_handler(self, ev):
+        # get topology info.
         msg = ev.msg
         datapath = msg.datapath
         ofproto = datapath.ofproto
         ofp_parser = datapath.ofproto_parser
  
-        in_port = msg.match['in_port']
-        dpid = datapath.id
- 
-        #second get ethernet protocol message
         pkt = packet.Packet(msg.data)
-        eth_pkt = pkt.get_protocol(ethernet.ethernet)
+        eth = pkt.get_protocol(ethernet.ethernet)
+        in_port = msg.match["in_port"]
  
-        eth_src = eth_pkt.src     #note: mac info willn`t  change in network
-        eth_dst = eth_pkt.dst
- 
-        out_port = self.get_out_port(datapath,eth_src,eth_dst,in_port)
+        # get out_port
+        out_port = self.get_out_port(datapath, eth.src, eth.dst, in_port)
         actions = [ofp_parser.OFPActionOutput(out_port)]
  
+        # installl flow entries
         if out_port != ofproto.OFPP_FLOOD:
-            match = ofp_parser.OFPMatch(in_port=in_port,eth_dst=eth_dst)
-            self.add_flow(datapath,1,match,actions)
- 
+            match = ofp_parser.OFPMatch(in_port=in_port, eth_dst=eth.dst)
+            self.add_flow(datapath, 1, match, actions)
+        # send packet_out msg to datapath，因为有packet_in,就必须对应有packet_out
         out = ofp_parser.OFPPacketOut(
-                datapath=datapath,buffer_id=msg.buffer_id,in_port=in_port,
-                actions=actions,data=msg.data
-            )
- 
+            datapath=datapath, buffer_id=msg.buffer_id, in_port=in_port, actions=actions)
         datapath.send_msg(out)
  
-    @set_ev_cls(event.EventSwitchEnter,[CONFIG_DISPATCHER,MAIN_DISPATCHER])    #event is not from openflow protocol, is come from switchs` state changed, just like: link to controller at the first time or send packet to controller
-    def get_topology(self,ev):
-        '''
-        get network topo construction, save info in the dict
-        '''
  
-        #store nodes info into the Graph
-        switch_list = get_switch(self.topology_api_app,None)    #------------need to get info,by debug
-        switches = [switch.dp.id for switch in switch_list]
-        self.network.add_nodes_from(switches)
- 
-        #store links info into the Graph
-        link_list = get_link(self.topology_api_app,None)
-        #port_no, in_port    ---------------need to debug, get diffirent from  both
-        links = [(link.src.dpid,link.dst.dpid,{'attr_dict':{'port':link.dst.port_no}}) for link in link_list]    #add edge, need src,dst,weigtht
-        self.network.add_edges_from(links)
- 
-        links  = [(link.dst.dpid,link.src.dpid,{'attr_dict':{'port':link.dst.port_no}}) for link in link_list]
-        self.network.add_edges_from(links)
- 
-    def get_out_port(self,datapath,src,dst,in_port):
-        '''
-        datapath: is current datapath info
-        src,dst: both are the host info
-        in_port: is current datapath in_port
-        '''
-        dpid = datapath.id
- 
-        #the first :Doesn`t find src host at graph
-        if src not in self.network:
-            self.network.add_node(src)
-            self.network.add_edge(dpid, src, attr_dict={'port':in_port})
-            self.network.add_edge(src, dpid)
-            self.paths.setdefault(src, {})
- 
-        #second: search the shortest path, from src to dst host
-        if dst in self.network:
-            if dst not in self.paths[src]:    #if not cache src to dst path,then to find it
-                path = nx.shortest_path(self.network,src,dst)
-                self.paths[src][dst]=path
- 
-            path = self.paths[src][dst]
-            next_hop = path[path.index(dpid)+1]
-            #print("1ooooooooooooooooooo")
-            #print(self.network[dpid][next_hop])
-            out_port = self.network[dpid][next_hop]['attr_dict']['port']
-            #print("2ooooooooooooooooooo")
-            #print(out_port)
- 
-            #get path info
-            #print("6666666666 find dst")
-            print(path)
-        else:
-            out_port = datapath.ofproto.OFPP_FLOOD    #By flood, to find dst, when dst get packet, dst will send a new back,the graph will record dst info
-            #print("8888888888 not find dst")
-        return out_port

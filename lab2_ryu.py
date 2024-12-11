@@ -17,23 +17,22 @@ class IPBasedRouting(app_manager.RyuApp):
         self.ip_to_port = {}         # IP address to port mapping
         self.datapaths = {}          # Datapaths for switches
     
-    @set_ev_cls(event.EventHostAdd)
-    def get_host_data(self, ev):
-        print("HI")
-        hosts = get_host(self, None)
-        for host in hosts:
-            print("1")
-            host_ip = host.ipv4[0] if host.ipv4 else None
-            if host_ip:
-                print("2")
-                self.network.add_node(host_ip)  # Add host to the graph
-                self.network.add_edge(host.ipv4[0], host.port.dpid, port=host.port.port_no)
-                self.network.add_edge(host.port.dpid, host.ipv4[0], port=host.port.port_no)
+    # @set_ev_cls(event.EventHostAdd)
+    # def get_host_data(self, ev):
+    #     print("HI")
+    #     hosts = get_host(self, None)
+    #     for host in hosts:
+    #         print("1")
+    #         host_ip = host.ipv4[0] if host.ipv4 else None
+    #         if host_ip:
+    #             print("2")
+    #             self.network.add_node(host_ip)  # Add host to the graph
+    #             self.network.add_edge(host.ipv4[0], host.port.dpid, port=host.port.port_no)
+    #             self.network.add_edge(host.port.dpid, host.ipv4[0], port=host.port.port_no)
     
     
     @set_ev_cls(event.EventSwitchEnter, event.EventHostAdd)
     def get_topology_data(self, ev):
-        print("HI888")
         # Discover network topology
         switches = get_switch(self, None)
         links = get_link(self, None)

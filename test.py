@@ -14,6 +14,9 @@ from ryu.topology.api import get_host, get_switch, get_link
 from ryu.topology import event
 from ryu.lib.packet import packet, ethernet, ipv4, arp
 import networkx as nx
+
+G = nx.Graph()
+G.add_nodes_from(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'])
  
 class MyRyu(app_manager.RyuApp):
     #使用協定
@@ -26,14 +29,14 @@ class MyRyu(app_manager.RyuApp):
     def get_topology_data(self, ev):
         # Discover network topology
         switches = get_switch(self, None)
-        links = get_link(self, None)
+        self.links = get_link(self, None)
 
         # Add switches to the graph
         for switch in switches:
             self.network.add_node(switch.dp.id)
 
         # Add links between switches
-        for link in links:
+        for link in self.links:
             self.network.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port_no)
             self.network.add_edge(link.dst.dpid, link.src.dpid, port=link.dst.port_no)
 
@@ -64,34 +67,6 @@ class MyRyu(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-
-        #在此定義轉發規則
-
-        '''
-        #port轉發
-        match = parser.OFPMatch(in_port=1)
-        actions = [parser.OFPActionOutput(port=2)]
-        self.add_flow(datapath, 0 ,match,actions)
-        match = parser.OFPMatch(in_port=2)
-        actions = [parser.OFPActionOutput(port=1)]
-        self.add_flow(datapath, 0 ,match,actions)
-        '''
-
-        '''
-        #mac轉發
-        match = parser.OFPMatch(in_port=1,eth_src='00:00:00:00:00:01')
-        actions = [parser.OFPActionOutput(port=2)]
-        self.add_flow(datapath, 0 ,match,actions)
-        match = parser.OFPMatch(in_port=2,eth_src='00:00:00:00:00:01')
-        actions = [parser.OFPActionOutput(port=1)]
-        self.add_flow(datapath, 0 ,match,actions)
-        match = parser.OFPMatch(in_port=1,eth_src='00:00:00:00:00:02')
-        actions = [parser.OFPActionOutput(port=2)]
-        self.add_flow(datapath, 0 ,match,actions)
-        match = parser.OFPMatch(in_port=2,eth_src='00:00:00:00:00:02')
-        actions = [parser.OFPActionOutput(port=1)]
-        self.add_flow(datapath, 0 ,match,actions)
-        '''
 
         
         #ip轉發
