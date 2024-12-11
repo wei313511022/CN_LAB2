@@ -183,12 +183,12 @@ class ArpHandler(app_manager.RyuApp):
             path = nx.shortest_path(self.graph, src_dpid, dst_dpid)
             print(f"Shortest path from {ip_src} to {ip_dst}: {path}")
         else:
-            print('hi')
             path = None
         if path is None:
             self.logger.info("Get path failed.")
             return 0
-        print(f"testing {ip_src} to {ip_dst}")
+        
+        # print(f"testing {ip_src} to {ip_dst}")
         # if self.get_host_location(ip_src)[0] == src_dpid:
         # print(f"Shortest path from {ip_src} to {ip_dst}: {path}")
             # print("path from " + ip_src + " to " + ip_dst +':')
@@ -221,6 +221,8 @@ class ArpHandler(app_manager.RyuApp):
             self.add_flow(dp, 10, to_dst_match, pre_actions+actions)
             port_no = to_port_no
         else:
+            if disjoint_path and len(disjoint_path) > 1:
+                self.install_path(to_dst_match, disjoint_path, pre_actions)
             self.install_path(to_dst_match, path, pre_actions)
             dst_dp = self.get_datapath(dst_dpid)
             actions = [dst_dp.ofproto_parser.OFPActionOutput(to_port_no)]
