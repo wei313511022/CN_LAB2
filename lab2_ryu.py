@@ -16,13 +16,26 @@ class IPBasedRouting(app_manager.RyuApp):
         self.network = nx.DiGraph()  # Graph for network topology
         self.ip_to_port = {}         # IP address to port mapping
         self.datapaths = {}          # Datapaths for switches
-
+    
+    @set_ev_cls(event.EventHostAdd)
+    def get_host(self, ev):
+        hosts = get_host(self, None)
+        for host in hosts:
+            print("1")
+            host_ip = host.ipv4[0] if host.ipv4 else None
+            if host_ip:
+                print("2")
+                self.network.add_node(host_ip)  # Add host to the graph
+                self.network.add_edge(host.ipv4[0], host.port.dpid, port=host.port.port_no)
+                self.network.add_edge(host.port.dpid, host.ipv4[0], port=host.port.port_no)
+    
+    
     @set_ev_cls(event.EventSwitchEnter, event.EventHostAdd)
     def get_topology_data(self, ev):
         # Discover network topology
         switches = get_switch(self, None)
         links = get_link(self, None)
-        hosts = get_host(self, None)
+        
 
         # Add switches to the graph
         for switch in switches:
@@ -34,14 +47,7 @@ class IPBasedRouting(app_manager.RyuApp):
             self.network.add_edge(link.dst.dpid, link.src.dpid, port=link.dst.port_no)
 
         # Add hosts and their links to switches
-        for host in hosts:
-            print("1")
-            host_ip = host.ipv4[0] if host.ipv4 else None
-            if host_ip:
-                print("2")
-                self.network.add_node(host_ip)  # Add host to the graph
-                self.network.add_edge(host.ipv4[0], host.port.dpid, port=host.port.port_no)
-                self.network.add_edge(host.port.dpid, host.ipv4[0], port=host.port.port_no)
+        
 
         self.logger.info(f"Discovered switches: {list(self.network.nodes)}")
         self.logger.info(f"Discovered links: {list(self.network.edges)}")
