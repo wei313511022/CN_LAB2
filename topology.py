@@ -56,7 +56,7 @@ def createTopo():
     switches = [net.addSwitch(f's{i}') for i in range(1, 9)]
 
     # Add hosts
-    hosts = [net.addHost(f'h{i}', ip=f'10.0.0.{i}') for i in range(1, 10)]
+    hosts = [net.addHost(f'h{i}', mac='00:00:00:00:00:0{i}', ip=f'10.0.0.{i}') for i in range(1, 10)]
 
     # Add links between switches and hosts
     links = [
