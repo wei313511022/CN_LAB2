@@ -209,6 +209,7 @@ class ArpHandler(app_manager.RyuApp):
         
         
         if len(path) == 1:
+            print(f"Shortest path from {ip_src} to {ip_dst}: {path[0]}")
             dp = self.get_datapath(src_dpid)
             actions = [dp.ofproto_parser.OFPActionOutput(to_port_no)]
             self.add_flow(dp, 10, to_dst_match, pre_actions+actions)
