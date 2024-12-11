@@ -6,8 +6,6 @@ from ryu.topology.api import get_host, get_switch, get_link
 from ryu.topology import event
 from ryu.lib.packet import packet, ethernet, ipv4, arp
 import networkx as nx
-from ryu.controller import dpset
-
 
 
 class IPBasedRouting(app_manager.RyuApp):
@@ -22,19 +20,26 @@ class IPBasedRouting(app_manager.RyuApp):
     @set_ev_cls(event.EventSwitchEnter)
     def get_topology_data(self, ev):
         # Discover network topology
-        hosts = get_host(self,None)
         switches = get_switch(self, None)
         links = get_link(self, None)
-        
-        for host in hosts:
-            self.network.add_node(host.dp.id)
+        hosts = get_host(self, None)
 
+        # Add switches to the graph
         for switch in switches:
             self.network.add_node(switch.dp.id)
 
+        # Add links between switches
         for link in links:
             self.network.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port_no)
             self.network.add_edge(link.dst.dpid, link.src.dpid, port=link.dst.port_no)
+
+        # Add hosts and their links to switches
+        for host in hosts:
+            host_ip = host.ipv4[0] if host.ipv4 else None
+            if host_ip:
+                self.network.add_node(host_ip)  # Add host to the graph
+                self.network.add_edge(host.ipv4[0], host.port.dpid, port=host.port.port_no)
+                self.network.add_edge(host.port.dpid, host.ipv4[0], port=host.port.port_no)
 
         self.logger.info(f"Discovered switches: {list(self.network.nodes)}")
         self.logger.info(f"Discovered links: {list(self.network.edges)}")
@@ -69,20 +74,22 @@ class IPBasedRouting(app_manager.RyuApp):
             self.ip_to_port[dpid][src_ip] = in_port
 
             # If destination IP is known, route the packet
-            if dst_ip in self.ip_to_port[dpid]:
-                out_port = self.ip_to_port[dpid][dst_ip]
-            else:
-                # Compute paths and install flow rules
-                if src_ip in self.network.nodes and dst_ip in self.network.nodes:
+            if dst_ip in self.network:
+                try:
                     primary_path, backup_path = self.compute_dual_paths(src_ip, dst_ip)
                     self.logger.info(f"Primary Path: {primary_path}")
                     self.logger.info(f"Backup Path: {backup_path}")
+
                     datapaths = {dp.id: dp for dp in self.datapaths.values()}
                     self.install_path(primary_path, parser, datapaths)
                     self.install_path(backup_path, parser, datapaths)
+
                     out_port = self.get_next_hop_port(primary_path, dpid)
-                else:
+                except nx.NetworkXNoPath:
+                    self.logger.error(f"No path found from {src_ip} to {dst_ip}")
                     out_port = ofproto.OFPP_FLOOD
+            else:
+                out_port = ofproto.OFPP_FLOOD
 
             actions = [parser.OFPActionOutput(out_port)]
             data = None if msg.buffer_id == ofproto.OFP_NO_BUFFER else msg.data
@@ -107,14 +114,10 @@ class IPBasedRouting(app_manager.RyuApp):
         """
         Compute two disjoint paths using NetworkX.
         """
-        try:
-            primary_path = nx.shortest_path(self.network, src, dst, weight='weight')
-            backup_graph = self.network.copy()
-            nx.utils.remove_path(backup_graph, primary_path)
-            backup_path = nx.shortest_path(backup_graph, src, dst, weight='weight')
-        except nx.NetworkXNoPath:
-            primary_path = []
-            backup_path = []
+        primary_path = nx.shortest_path(self.network, src, dst, weight='weight')
+        backup_graph = self.network.copy()
+        nx.utils.remove_path(backup_graph, primary_path)
+        backup_path = nx.shortest_path(backup_graph, src, dst, weight='weight')
         return primary_path, backup_path
 
     def install_path(self, path, parser, datapaths):
@@ -122,12 +125,12 @@ class IPBasedRouting(app_manager.RyuApp):
         Install flow rules along a given path.
         """
         for i in range(len(path) - 1):
-            src_switch = path[i]
-            dst_switch = path[i + 1]
-            out_port = self.network[src_switch][dst_switch]['port']
-            in_port = self.network[dst_switch][src_switch]['port']
+            src = path[i]
+            dst = path[i + 1]
+            out_port = self.network[src][dst]['port']
+            in_port = self.network[dst][src]['port']
 
-            datapath = datapaths[src_switch]
+            datapath = datapaths[src] if src in datapaths else datapaths[dst]
             match = parser.OFPMatch(in_port=in_port)
             actions = [parser.OFPActionOutput(out_port)]
             self.add_flow(datapath, 1, match, actions)
