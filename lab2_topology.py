@@ -56,6 +56,7 @@ if '__main__' == __name__:
     net.addLink(s6, s7, port1=2, port2=4)
     net.addLink(s1, s6, port1=4, port2=3)
     net.addLink(s4, s8, port1=4, port2=4)
+    net.addLink(s4, s5, port1=5, port2=6)
 
     # 建立 Mininet
     net.build()
