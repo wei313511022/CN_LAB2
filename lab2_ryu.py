@@ -2,7 +2,7 @@ from ryu.base import app_manager
 from ryu.controller import ofp_event
 from ryu.controller.handler import MAIN_DISPATCHER, CONFIG_DISPATCHER, set_ev_cls
 from ryu.ofproto import ofproto_v1_3
-from ryu.topology.api import get_switch, get_link
+from ryu.topology.api import get_host, get_switch, get_link
 from ryu.topology import event
 from ryu.lib.packet import packet, ethernet, ipv4, arp
 import networkx as nx
@@ -22,18 +22,17 @@ class IPBasedRouting(app_manager.RyuApp):
     @set_ev_cls(event.EventSwitchEnter)
     def get_topology_data(self, ev):
         # Discover network topology
+        hosts = get_host(self,None)
         switches = get_switch(self, None)
         links = get_link(self, None)
         
+        for host in hosts:
+            self.network.add_node(host.dp.id)
 
         for switch in switches:
             self.network.add_node(switch.dp.id)
 
         for link in links:
-            # print(link.src.dpid)
-            # print(link.src.port_no)
-            # print(link.dst.dpid)
-            # print(link.dst.port_no)
             self.network.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port_no)
             self.network.add_edge(link.dst.dpid, link.src.dpid, port=link.dst.port_no)
 
