@@ -221,8 +221,6 @@ class ArpHandler(app_manager.RyuApp):
             self.add_flow(dp, 10, to_dst_match, pre_actions+actions)
             port_no = to_port_no
         else:
-            if disjoint_path and len(disjoint_path) > 1:
-                self.install_path(to_dst_match, disjoint_path, pre_actions)
             self.install_path(to_dst_match, path, pre_actions)
             dst_dp = self.get_datapath(dst_dpid)
             actions = [dst_dp.ofproto_parser.OFPActionOutput(to_port_no)]
