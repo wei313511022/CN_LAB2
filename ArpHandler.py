@@ -209,7 +209,7 @@ class ArpHandler(app_manager.RyuApp):
             else:
                 disjoint_path = None
                 print("No disjoint path found.")
-        elif len(path) == 2:
+        elif len(path) < 3:
             print(f"Disjoint path from {ip_src} to {ip_dst}: {path}\n")
         
         
