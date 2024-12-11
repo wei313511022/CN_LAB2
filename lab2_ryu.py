@@ -92,7 +92,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         # the "miss_send_length" of your switch
         if ev.msg.msg_len < ev.msg.total_len:
             self.logger.debug("packet truncated: only %s of %s bytes",
-                              ev.msg.msg_len, ev.msg.total_len)
+                            ev.msg.msg_len, ev.msg.total_len)
         msg = ev.msg
         datapath = msg.datapath
         ofproto = datapath.ofproto
@@ -107,17 +107,15 @@ class SimpleSwitch13(app_manager.RyuApp):
             return
         dst = eth.dst
         src = eth.src
-        # print(f"{src}  {dst}")
 
-        # dpid = format(datapath.id, "d").zfill(16)
-        # self.mac_to_port.setdefault(dpid, {})
-        dpid = format(datapath.id, "d").zfill(16)
-        switch_name = f"Switch-{dpid}"  # Create a readable switch name
-        self.logger.info("Packet received from %s: src=%s, dst=%s, in_port=%s", switch_name, src, dst, in_port)
+        # Format and print the switch (datapath) name
+        dpid = format(datapath.id, "d").zfill(16)  # Format datapath ID
+        switch_name = f"Switch-{dpid}"  # Assign a readable name
+        print(f"Switch Name: {switch_name}")  # Print the switch name
 
-        # self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
+        self.mac_to_port.setdefault(dpid, {})
 
-        # learn a mac address to avoid FLOOD next time.
+        # Learn a MAC address to avoid FLOOD next time
         self.mac_to_port[dpid][src] = in_port
 
         if dst in self.mac_to_port[dpid]:
@@ -127,11 +125,9 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         actions = [parser.OFPActionOutput(out_port)]
 
-        # install a flow to avoid packet_in next time
+        # Install a flow to avoid packet_in next time
         if out_port != ofproto.OFPP_FLOOD:
             match = parser.OFPMatch(in_port=in_port, eth_dst=dst, eth_src=src)
-            # verify if we have a valid buffer_id, if yes avoid to send both
-            # flow_mod & packet_out
             if msg.buffer_id != ofproto.OFP_NO_BUFFER:
                 self.add_flow(datapath, 1, match, actions, msg.buffer_id)
                 return
@@ -142,6 +138,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             data = msg.data
 
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
-                                  in_port=in_port, actions=actions, data=data)
+                                in_port=in_port, actions=actions, data=data)
         datapath.send_msg(out)
+
         
