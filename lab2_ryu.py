@@ -21,7 +21,8 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
-
+from ryu.topology.api import get_host, get_switch, get_link
+from ryu.topology import event
 
 class SimpleSwitch13(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -29,6 +30,28 @@ class SimpleSwitch13(app_manager.RyuApp):
     def __init__(self, *args, **kwargs):
         super(SimpleSwitch13, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
+    
+    @set_ev_cls(event.EventSwitchEnter, event.EventHostAdd)
+    def get_topology_data(self, ev):
+        # Discover network topology
+        switches = get_switch(self, None)
+        links = get_link(self, None)
+        
+
+        # Add switches to the graph
+        for switch in switches:
+            self.network.add_node(switch.dp.id)
+
+        # Add links between switches
+        for link in links:
+            self.network.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port_no)
+            self.network.add_edge(link.dst.dpid, link.src.dpid, port=link.dst.port_no)
+
+        # Add hosts and their links to switches
+        
+
+        self.logger.info(f"Discovered switches: {list(self.network.nodes)}")
+        self.logger.info(f"Discovered links: {list(self.network.edges)}")
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -84,7 +107,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             return
         dst = eth.dst
         src = eth.src
-        print(f"{src}  {dst}")
+        # print(f"{src}  {dst}")
 
         dpid = format(datapath.id, "d").zfill(16)
         self.mac_to_port.setdefault(dpid, {})
