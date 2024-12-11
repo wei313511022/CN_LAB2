@@ -1,65 +1,129 @@
-from mininet.net import Mininet
-from mininet.node import RemoteController
-from mininet.cli import CLI
+# -*- coding:utf-8 -*-
+#Start Command: ryu-manager ryuAddflow.py
+from ryu.base import app_manager
+from ryu.ofproto import ofproto_v1_3
+from ryu.controller.handler import set_ev_cls
+from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
+from ryu.controller import ofp_event
+from ryu.ofproto import ofproto_v1_3_parser
 
-def custom_topology():
-    net = Mininet(controller=RemoteController)
+from ryu.lib.packet import ether_types
+from ryu.lib.packet import in_proto as inet
 
-    # Add switches
-    s1 = net.addSwitch('s1')
-    s2 = net.addSwitch('s2')
-    s3 = net.addSwitch('s3')
-    s4 = net.addSwitch('s4')
-    s5 = net.addSwitch('s5')
-    s6 = net.addSwitch('s6')
-    s7 = net.addSwitch('s7')
-    s8 = net.addSwitch('s8')
+from ryu.topology.api import get_host, get_switch, get_link
+from ryu.topology import event
+from ryu.lib.packet import packet, ethernet, ipv4, arp
+import networkx as nx
+ 
+class MyRyu(app_manager.RyuApp):
+    #使用協定
+    OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+    #初始化
+    def __init__(self, *args, **kwargs):
+        super(MyRyu, self).__init__(*args, **kwargs)
+        
+    @set_ev_cls(event.EventSwitchEnter)
+    def get_topology_data(self, ev):
+        # Discover network topology
+        switches = get_switch(self, None)
+        links = get_link(self, None)
 
-    # Add hosts
-    h1 = net.addHost('h1')
-    h2 = net.addHost('h2')
-    h3 = net.addHost('h3')
-    h4 = net.addHost('h4')
-    h5 = net.addHost('h5')
-    h6 = net.addHost('h6')
-    h7 = net.addHost('h7')
-    h8 = net.addHost('h8')
-    h9 = net.addHost('h9')
+        # Add switches to the graph
+        for switch in switches:
+            self.network.add_node(switch.dp.id)
 
-    # Add links between hosts and switches
-    net.addLink(h1, s1)
-    net.addLink(h2, s1)
-    net.addLink(h3, s7)
-    net.addLink(h4, s5)
-    net.addLink(h5, s5)
-    net.addLink(h6, s8)
-    net.addLink(h7, s8)
-    net.addLink(h8, s6)
-    net.addLink(h9, s4)
+        # Add links between switches
+        for link in links:
+            self.network.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port_no)
+            self.network.add_edge(link.dst.dpid, link.src.dpid, port=link.dst.port_no)
 
-    # Add links between switches
-    net.addLink(s1, s2)
-    net.addLink(s1, s3)
-    net.addLink(s2, s3)
-    net.addLink(s2, s4)
-    net.addLink(s2, s5)
-    net.addLink(s2, s7)
-    net.addLink(s3, s4)
-    net.addLink(s5, s7)
-    net.addLink(s5, s8)
-    net.addLink(s6, s7)
-    net.addLink(s7, s8)
+        self.logger.info(f"Discovered switches: {list(self.network.nodes)}")
+        self.logger.info(f"Discovered links: {list(self.network.edges)}")
 
-    # Add controller
-    c0 = net.addController('c0', controller=RemoteController, ip='127.0.0.1', port=6633)
+    @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
+    #一開始Switch連上Controller時的初始設定Function
+    def switch_features_handler(self, ev):
+        # 接收 OpenFlow 交換器實例
+        datapath = ev.msg.datapath
+        self.send_port_stats_request(datapath)
+ 
+    def send_port_stats_request(self, datapath):
+        #OpenFlow 交換器使用的OF協定版本
+        ofp = datapath.ofproto
+        #處理OF協定的parser
+        ofp_parser = datapath.ofproto_parser
+        req = ofp_parser.OFPPortStatsRequest(datapath, 0, ofp.OFPP_ANY)
+        #送回Switch
+        datapath.send_msg(req)
+ 
+    #對交換器的Flow Entry取得資料
+    @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
+    def port_stats_reply_handler(self, ev):
+        msg = ev.msg
+        datapath = msg.datapath
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
 
-    # Start the network
-    net.build()
-    c0.start()
-    net.start()
 
-    CLI(net)
-    net.stop()
+        #在此定義轉發規則
 
-if __name__ == '__main__':
-    custom_topology()
+        '''
+        #port轉發
+        match = parser.OFPMatch(in_port=1)
+        actions = [parser.OFPActionOutput(port=2)]
+        self.add_flow(datapath, 0 ,match,actions)
+        match = parser.OFPMatch(in_port=2)
+        actions = [parser.OFPActionOutput(port=1)]
+        self.add_flow(datapath, 0 ,match,actions)
+        '''
+
+        '''
+        #mac轉發
+        match = parser.OFPMatch(in_port=1,eth_src='00:00:00:00:00:01')
+        actions = [parser.OFPActionOutput(port=2)]
+        self.add_flow(datapath, 0 ,match,actions)
+        match = parser.OFPMatch(in_port=2,eth_src='00:00:00:00:00:01')
+        actions = [parser.OFPActionOutput(port=1)]
+        self.add_flow(datapath, 0 ,match,actions)
+        match = parser.OFPMatch(in_port=1,eth_src='00:00:00:00:00:02')
+        actions = [parser.OFPActionOutput(port=2)]
+        self.add_flow(datapath, 0 ,match,actions)
+        match = parser.OFPMatch(in_port=2,eth_src='00:00:00:00:00:02')
+        actions = [parser.OFPActionOutput(port=1)]
+        self.add_flow(datapath, 0 ,match,actions)
+        '''
+
+        
+        #ip轉發
+        match = parser.OFPMatch(in_port=1,eth_type=0x806)
+        actions = [parser.OFPActionOutput(port=2)]
+        self.add_flow(datapath, 0 ,match,actions)
+        match = parser.OFPMatch(in_port=2,eth_type=0x806)
+        actions = [parser.OFPActionOutput(port=1)]
+        self.add_flow(datapath, 0 ,match,actions)
+        match = parser.OFPMatch(in_port=1,eth_type=0x800,ipv4_src='10.0.0.1')
+        actions = [parser.OFPActionOutput(port=2)]
+        self.add_flow(datapath, 0 ,match,actions)
+        match = parser.OFPMatch(in_port=2,eth_type=0x800,ipv4_src='10.0.0.1')
+        actions = [parser.OFPActionOutput(port=1)]
+        self.add_flow(datapath, 0 ,match,actions)
+        match = parser.OFPMatch(in_port=1,eth_type=0x800,ipv4_src='10.0.0.2')
+        actions = [parser.OFPActionOutput(port=2)]
+        self.add_flow(datapath, 0 ,match,actions)
+        match = parser.OFPMatch(in_port=2,eth_type=0x800,ipv4_src='10.0.0.2')
+        actions = [parser.OFPActionOutput(port=1)]
+        self.add_flow(datapath, 0 ,match,actions)
+        
+
+
+
+
+    def add_flow(self, datapath, priority, match, actions):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        #規劃的動作
+        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions)]
+        #產生一個Packet-Out事件
+        mod = parser.OFPFlowMod(datapath=datapath, priority=priority, command=ofproto.OFPFC_ADD, match=match, instructions=inst)
+        #將封包傳回至switch
+        datapath.send_msg(mod)

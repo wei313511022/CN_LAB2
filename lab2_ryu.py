@@ -17,7 +17,7 @@ class IPBasedRouting(app_manager.RyuApp):
         self.ip_to_port = {}         # IP address to port mapping
         self.datapaths = {}          # Datapaths for switches
 
-    @set_ev_cls(event.EventSwitchEnter)
+    @set_ev_cls(event.EventSwitchEnter, event.EventHostAdd)
     def get_topology_data(self, ev):
         # Discover network topology
         switches = get_switch(self, None)
