@@ -1,22 +1,25 @@
 from ryu.base import app_manager
 from ryu.controller import ofp_event
-from ryu.controller.handler import MAIN_DISPATCHER, CONFIG_DISPATCHER, set_ev_cls
+from ryu.controller.handler import MAIN_DISPATCHER, set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.topology.api import get_switch, get_link
 from ryu.topology import event
+from ryu.lib.packet import packet, ethernet
 import networkx as nx
+
 
 class DualPathRouting(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
         super(DualPathRouting, self).__init__(*args, **kwargs)
-        self.network = nx.DiGraph()  # Use networkx for graph representation
+        self.network = nx.DiGraph()  # Graph for network topology
         self.mac_to_port = {}        # MAC address to port mapping
+        self.datapaths = {}          # Datapaths for switches
 
     @set_ev_cls(event.EventSwitchEnter)
     def get_topology_data(self, ev):
-        # Build the network topology graph
+        # Discover network topology
         switches = get_switch(self, None)
         links = get_link(self, None)
 
@@ -27,6 +30,9 @@ class DualPathRouting(app_manager.RyuApp):
             self.network.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port)
             self.network.add_edge(link.dst.dpid, link.src.dpid, port=link.dst.port)
 
+        self.logger.info(f"Discovered switches: {list(self.network.nodes)}")
+        self.logger.info(f"Discovered links: {list(self.network.edges)}")
+
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
         msg = ev.msg
@@ -36,7 +42,7 @@ class DualPathRouting(app_manager.RyuApp):
         in_port = msg.match['in_port']
 
         pkt = packet.Packet(msg.data)
-        eth = pkt.get_protocols(ethernet.ethernet)[0]
+        eth = pkt.get_protocol(ethernet.ethernet)
 
         dst = eth.dst
         src = eth.src
@@ -44,34 +50,41 @@ class DualPathRouting(app_manager.RyuApp):
         dpid = datapath.id
         self.mac_to_port.setdefault(dpid, {})
 
-        # Learn MAC address
+        # Learn the source MAC address
         self.mac_to_port[dpid][src] = in_port
+
+        # Handle ARP packets by flooding
+        if eth.ethertype == 0x806:  # ARP packets
+            actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
+            out = parser.OFPPacketOut(
+                datapath=datapath, buffer_id=msg.buffer_id,
+                in_port=in_port, actions=actions, data=msg.data
+            )
+            datapath.send_msg(out)
+            return
 
         # If destination MAC is known, route the packet
         if dst in self.mac_to_port[dpid]:
             out_port = self.mac_to_port[dpid][dst]
         else:
-            # Compute dual paths
+            # Compute paths and install flow rules
             if src in self.network.nodes and dst in self.network.nodes:
                 primary_path, backup_path = self.compute_dual_paths(src, dst)
                 self.logger.info(f"Primary Path: {primary_path}")
                 self.logger.info(f"Backup Path: {backup_path}")
-                
-                # Install flow rules for primary and backup paths
-                self.install_path(primary_path, parser, datapath)
-                self.install_path(backup_path, parser, datapath)
-
-                # Forward the packet
+                datapaths = {dp.id: dp for dp in self.datapaths.values()}
+                self.install_path(primary_path, parser, datapaths)
+                self.install_path(backup_path, parser, datapaths)
                 out_port = self.get_next_hop_port(primary_path, dpid)
             else:
                 out_port = ofproto.OFPP_FLOOD
 
         actions = [parser.OFPActionOutput(out_port)]
         data = None if msg.buffer_id == ofproto.OFP_NO_BUFFER else msg.data
-
         out = parser.OFPPacketOut(
             datapath=datapath, buffer_id=msg.buffer_id, in_port=in_port,
-            actions=actions, data=data)
+            actions=actions, data=data
+        )
         datapath.send_msg(out)
 
     def compute_dual_paths(self, src, dst):
@@ -80,25 +93,27 @@ class DualPathRouting(app_manager.RyuApp):
         """
         try:
             primary_path = nx.shortest_path(self.network, src, dst, weight='weight')
-            backup_path = nx.shortest_path(self.network, src, dst, weight='weight', method='dijkstra', disjoint=True)
+            backup_graph = self.network.copy()
+            nx.utils.remove_path(backup_graph, primary_path)
+            backup_path = nx.shortest_path(backup_graph, src, dst, weight='weight')
         except nx.NetworkXNoPath:
             primary_path = []
             backup_path = []
         return primary_path, backup_path
 
-    def install_path(self, path, parser, datapath):
+    def install_path(self, path, parser, datapaths):
         """
-        Install flow rules along the given path.
+        Install flow rules along a given path.
         """
         for i in range(len(path) - 1):
             src_switch = path[i]
             dst_switch = path[i + 1]
             out_port = self.network[src_switch][dst_switch]['port']
+            in_port = self.network[dst_switch][src_switch]['port']
 
-            match = parser.OFPMatch(in_port=src_switch)
+            datapath = datapaths[src_switch]
+            match = parser.OFPMatch(in_port=in_port)
             actions = [parser.OFPActionOutput(out_port)]
-
-            # Send flow mod message
             self.add_flow(datapath, 1, match, actions)
 
     def get_next_hop_port(self, path, dpid):
@@ -120,5 +135,7 @@ class DualPathRouting(app_manager.RyuApp):
         parser = datapath.ofproto_parser
 
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
-        mod = parser.OFPFlowMod(datapath=datapath, priority=priority, match=match, instructions=inst)
+        mod = parser.OFPFlowMod(
+            datapath=datapath, priority=priority, match=match, instructions=inst
+        )
         datapath.send_msg(mod)
