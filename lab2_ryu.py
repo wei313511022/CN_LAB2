@@ -110,7 +110,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         
         if "00:00:00:00:00:0" in src:
             if int(src[-1])>0 and int(src[-1])<10:
-                print(f"Host Src: {src[-1]}")
+                print(f"Host Src: {src}")
         
         # Format and print the switch (datapath) name
         dpid = format(datapath.id, "d").zfill(1)  # Format datapath ID
@@ -119,7 +119,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         
         if "00:00:00:00:00:0" in dst:
             if int(dst[-1])>0 and int(dst[-1])<10:
-                print(f"Host Dst: {dst[-1]}")
+                print(f"Host Dst: {dst}")
 
         self.mac_to_port.setdefault(dpid, {})
 
