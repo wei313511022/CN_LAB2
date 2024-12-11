@@ -22,6 +22,7 @@ class IPBasedRouting(app_manager.RyuApp):
         # Discover network topology
         switches = get_switch(self, None)
         links = get_link(self, None)
+        print(links)
 
         for switch in switches:
             self.network.add_node(switch.dp.id)
