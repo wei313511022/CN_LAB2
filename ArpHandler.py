@@ -211,7 +211,7 @@ class ArpHandler(app_manager.RyuApp):
             print(f"Disjoint path from {ip_src} to {ip_dst}: {path}\n")
         
         
-        if len(path) == 1:
+        if len(path) < 2:
             print(f"Shortest path from {ip_src} to {ip_dst}: {path}")
             print(f"Disjoint path from {ip_src} to {ip_dst}: {path}\n")
             dp = self.get_datapath(src_dpid)
