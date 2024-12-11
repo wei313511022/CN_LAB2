@@ -19,6 +19,8 @@ from ryu.lib.ofp_pktinfilter import packet_in_filter, RequiredTypeFilter
 
 import networkx as nx
 
+ip_history = set()
+
 class ArpHandler(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
@@ -179,6 +181,11 @@ class ArpHandler(app_manager.RyuApp):
                           to_dst_match,
                           pre_actions=[]
                           ):
+        if [ip_src,ip_dst] in ip_history:
+            return 0
+        else:
+            ip_history.add([ip_src,ip_dst])
+            
         if nx.has_path(self.graph, src_dpid, dst_dpid):
             path = nx.shortest_path(self.graph, src_dpid, dst_dpid)
             print(f"Shortest path from {ip_src} to {ip_dst}: {path}")
