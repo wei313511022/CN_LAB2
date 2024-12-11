@@ -181,14 +181,16 @@ class ArpHandler(app_manager.RyuApp):
                           ):
         if nx.has_path(self.graph, src_dpid, dst_dpid):
             path = nx.shortest_path(self.graph, src_dpid, dst_dpid)
+            print(f"Shortest path from {ip_src} to {ip_dst}: {path}")
         else:
+            print('hi')
             path = None
         if path is None:
             self.logger.info("Get path failed.")
             return 0
-        
+        print(f"testing {ip_src} to {ip_dst}")
         # if self.get_host_location(ip_src)[0] == src_dpid:
-        print(f"Shortest path from {ip_src} to {ip_dst}: {path}")
+        # print(f"Shortest path from {ip_src} to {ip_dst}: {path}")
             # print("path from " + ip_src + " to " + ip_dst +':')
             # print(ip_src + ' ->'),
             # for sw in path:
