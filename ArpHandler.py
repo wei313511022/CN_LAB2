@@ -181,14 +181,14 @@ class ArpHandler(app_manager.RyuApp):
                           to_dst_match,
                           pre_actions=[]
                           ):
-        if (ip_src+ip_dst) in ip_history:
-            return 0
-        else:
-            ip_history.add((ip_src+ip_dst))
+        
             
         if nx.has_path(self.graph, src_dpid, dst_dpid):
             path = nx.shortest_path(self.graph, src_dpid, dst_dpid)
-            print(f"Shortest path from {ip_src} to {ip_dst}: {path}")
+            if (ip_src+ip_dst) in ip_history:
+                pass
+            else:
+                print(f"Shortest path from {ip_src} to {ip_dst}: {path}")
         else:
             path = None
         if path is None:
@@ -212,12 +212,20 @@ class ArpHandler(app_manager.RyuApp):
             if nx.has_path(temp_graph, src_dpid, dst_dpid):
             # Find the most disjoint path
                 disjoint_path = nx.shortest_path(temp_graph, src_dpid, dst_dpid)
-                print(f"Disjoint path from {ip_src} to {ip_dst}: {disjoint_path}\n")
+                if (ip_src+ip_dst) in ip_history:
+                    pass
+                else:
+                    ip_history.add((ip_src+ip_dst))
+                    print(f"Disjoint path from {ip_src} to {ip_dst}: {disjoint_path}\n")
             else:
                 disjoint_path = None
                 print("No disjoint path found.")
         elif len(path) < 3:
-            print(f"Disjoint path from {ip_src} to {ip_dst}: {path}\n")
+            if (ip_src+ip_dst) in ip_history:
+                pass
+            else:
+                ip_history.add((ip_src+ip_dst))
+                print(f"Disjoint path from {ip_src} to {ip_dst}: {disjoint_path}\n")
         
         
         if len(path) == 1:
