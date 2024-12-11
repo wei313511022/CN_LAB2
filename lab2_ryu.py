@@ -18,7 +18,7 @@ class IPBasedRouting(app_manager.RyuApp):
         self.datapaths = {}          # Datapaths for switches
     
     @set_ev_cls(event.EventHostAdd)
-    def get_host(self, ev):
+    def get_host_data(self, ev):
         hosts = get_host(self, None)
         for host in hosts:
             print("1")
