@@ -35,14 +35,16 @@ class IPBasedRouting(app_manager.RyuApp):
 
         # Add hosts and their links to switches
         for host in hosts:
+            print("1")
             host_ip = host.ipv4[0] if host.ipv4 else None
             if host_ip:
+                print("2")
                 self.network.add_node(host_ip)  # Add host to the graph
                 self.network.add_edge(host.ipv4[0], host.port.dpid, port=host.port.port_no)
                 self.network.add_edge(host.port.dpid, host.ipv4[0], port=host.port.port_no)
 
-        self.logger.info(f"Discovered switches: {list(self.network.nodes)}")
-        self.logger.info(f"Discovered links: {list(self.network.edges)}")
+        # self.logger.info(f"Discovered switches: {list(self.network.nodes)}")
+        # self.logger.info(f"Discovered links: {list(self.network.edges)}")
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
