@@ -31,27 +31,27 @@ class SimpleSwitch13(app_manager.RyuApp):
         super(SimpleSwitch13, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
     
-    @set_ev_cls(event.EventSwitchEnter, event.EventHostAdd)
-    def get_topology_data(self, ev):
-        # Discover network topology
-        switches = get_switch(self, None)
-        links = get_link(self, None)
+    # @set_ev_cls(event.EventSwitchEnter, event.EventHostAdd)
+    # def get_topology_data(self, ev):
+    #     # Discover network topology
+    #     switches = get_switch(self, None)
+    #     links = get_link(self, None)
         
 
-        # Add switches to the graph
-        for switch in switches:
-            self.network.add_node(switch.dp.id)
+    #     # Add switches to the graph
+    #     for switch in switches:
+    #         self.network.add_node(switch.dp.id)
 
-        # Add links between switches
-        for link in links:
-            self.network.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port_no)
-            self.network.add_edge(link.dst.dpid, link.src.dpid, port=link.dst.port_no)
+    #     # Add links between switches
+    #     for link in links:
+    #         self.network.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port_no)
+    #         self.network.add_edge(link.dst.dpid, link.src.dpid, port=link.dst.port_no)
 
-        # Add hosts and their links to switches
+    #     # Add hosts and their links to switches
         
 
-        self.logger.info(f"Discovered switches: {list(self.network.nodes)}")
-        self.logger.info(f"Discovered links: {list(self.network.edges)}")
+    #     self.logger.info(f"Discovered switches: {list(self.network.nodes)}")
+    #     self.logger.info(f"Discovered links: {list(self.network.edges)}")
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -109,8 +109,11 @@ class SimpleSwitch13(app_manager.RyuApp):
         src = eth.src
         # print(f"{src}  {dst}")
 
+        # dpid = format(datapath.id, "d").zfill(16)
+        # self.mac_to_port.setdefault(dpid, {})
         dpid = format(datapath.id, "d").zfill(16)
-        self.mac_to_port.setdefault(dpid, {})
+        switch_name = f"Switch-{dpid}"  # Create a readable switch name
+        self.logger.info("Packet received from %s: src=%s, dst=%s, in_port=%s", switch_name, src, dst, in_port)
 
         # self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
 
