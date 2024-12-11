@@ -108,14 +108,18 @@ class SimpleSwitch13(app_manager.RyuApp):
         dst = eth.dst
         src = eth.src
         
-         # Resolve host names if available
-        src_host = self.host_map.get(src, f"Unknown ({src})")
-        dst_host = self.host_map.get(dst, f"Unknown ({dst})")
-
+        if "00:00:00:00:00:0" in src:
+            if int(src[-1])>0 and int(src[-1])<10:
+                print(f"Host Sending Data: {src[-1]}")
+        
         # Format and print the switch (datapath) name
         dpid = format(datapath.id, "d").zfill(1)  # Format datapath ID
         switch_name = f"{dpid}"  # Assign a readable name
-        print(f"Switch : {switch_name} | Host Sending Data: {src_host} | Destination Host: {dst_host}")
+        print(f"Switch : {switch_name}")
+        
+        if "00:00:00:00:00:0" in dst:
+            if int(dst[-1])>0 and int(dst[-1])<10:
+                print(f"Host Sending Data: {dst[-1]}")
 
         self.mac_to_port.setdefault(dpid, {})
 
