@@ -31,9 +31,9 @@ class IPBasedRouting(app_manager.RyuApp):
 
         for link in links:
             print(link.src.dpid)
-            print(link.src.port)
+            print(link.src.Port)
             print(link.dst.dpid)
-            print(link.dst.port)
+            print(link.dst.Port)
             # self.network.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port)
             # self.network.add_edge(link.dst.dpid, link.src.dpid, port=link.dst.port)
 
