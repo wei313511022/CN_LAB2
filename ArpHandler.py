@@ -225,7 +225,7 @@ class ArpHandler(app_manager.RyuApp):
                 pass
             else:
                 ip_history.add((ip_src+ip_dst))
-                print(f"Disjoint path from {ip_src} to {ip_dst}: {disjoint_path}\n")
+                print(f"Disjoint path from {ip_src} to {ip_dst}: {path}\n")
         
         
         if len(path) == 1:
