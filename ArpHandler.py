@@ -187,8 +187,8 @@ class ArpHandler(app_manager.RyuApp):
             self.logger.info("Get path failed.")
             return 0
         
-        if self.get_host_location(ip_src)[0] == src_dpid:
-            print(f"Shortest path from {ip_src} to {ip_dst}: {path}")
+        # if self.get_host_location(ip_src)[0] == src_dpid:
+        print(f"Shortest path from {ip_src} to {ip_dst}: {path}")
             # print("path from " + ip_src + " to " + ip_dst +':')
             # print(ip_src + ' ->'),
             # for sw in path:
