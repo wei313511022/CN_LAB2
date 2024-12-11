@@ -202,14 +202,15 @@ class ArpHandler(app_manager.RyuApp):
         if nx.has_path(temp_graph, src_dpid, dst_dpid):
         # Find the most disjoint path
             disjoint_path = nx.shortest_path(temp_graph, src_dpid, dst_dpid)
-            print(f"Disjoint path from {ip_src} to {ip_dst}: {disjoint_path}")
+            print(f"Disjoint path from {ip_src} to {ip_dst}: {disjoint_path}\n")
         else:
             disjoint_path = None
             print("No disjoint path found.")
         
         
         if len(path) == 1:
-            print(f"Shortest path from {ip_src} to {ip_dst}: {path[0]}")
+            print(f"Disjoint path from {ip_src} to {ip_dst}: {path}")
+            print(f"Disjoint path from {ip_src} to {ip_dst}: {path}\n")
             dp = self.get_datapath(src_dpid)
             actions = [dp.ofproto_parser.OFPActionOutput(to_port_no)]
             self.add_flow(dp, 10, to_dst_match, pre_actions+actions)
