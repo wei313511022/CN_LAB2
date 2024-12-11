@@ -188,8 +188,16 @@ class ArpHandler(app_manager.RyuApp):
             return 0
         
         temp_graph = self.graph.copy()
-        for i in range(len(path) - 1):
-            print(f"test {path[i]}")
+        for i in range(1,(len(path) - 1)):
+            temp_graph.remove_edge(path[i], path[i + 1])
+        if nx.has_path(temp_graph, src_dpid, dst_dpid):
+        # Find the most disjoint path
+            disjoint_path = nx.shortest_path(temp_graph, src_dpid, dst_dpid)
+            print(f"Disjoint path from {ip_src} to {ip_dst}: {disjoint_path}")
+        else:
+            disjoint_path = None
+            
+        print("No disjoint path found.")
         
         if self.get_host_location(ip_src)[0] == src_dpid:
             print("path from " + ip_src + " to " + ip_dst +':')
